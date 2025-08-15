@@ -4,7 +4,7 @@ A WordPress plugin that automatically fixes Twitter/X and Instagram embeds that 
 
 ## Description
 
-Mai Embed Fixer is designed to solve common issues with social media embeds in WordPress. It specifically targets Twitter/X and Instagram embeds that may not be rendering correctly due to WordPress's default embed handling.
+Mai Embed Fixer is designed to solve common issues with social media embeds in WordPress. It specifically targets Twitter/X and Instagram embeds that may not be rendering correctly due to the changes in various social media platform API's which affect their integrations with oEmbed.
 
 ## Features
 
