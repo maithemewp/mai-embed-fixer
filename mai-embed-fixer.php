@@ -4,7 +4,7 @@
  * Plugin Name:     Mai Embed Fixer
  * Plugin URI:      https://bizbudding.com/
  * Description:     Attempts to fix twitter/x and instagram embeds that aren't working in WordPress.
- * Version:         0.1.0
+ * Version:         0.1.1
  *
  * Author:          BizBudding
  * Author URI:      https://bizbudding.com
@@ -101,8 +101,6 @@ function add_scripts( $content ) {
 		break;
 	}
 
-	// ray( $content );
-
 	// Set up tag processor.
 	$tags = new WP_HTML_Tag_Processor( $content );
 
@@ -121,8 +119,6 @@ function add_scripts( $content ) {
 	if ( $has_twitter ) {
 		// Check if the content already has Twitter script tags.
 		if ( str_contains( $content, 'https://platform.twitter.com/widgets.js' ) ) {
-			ray( 'we have twitter script' );
-
 			// Remove all Twitter script tags except the first one.
 			$content = preg_replace( '/<script[^>]*src="[^"]*platform\.twitter\.com\/widgets\.js[^"]*"[^>]*><\/script>/', '', $content, -1 );
 		}
