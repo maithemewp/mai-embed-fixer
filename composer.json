@@ -1,4 +1,5 @@
 {
+    "name": "mai/embed-fixer",
     "require": {
         "yahnis-elsts/plugin-update-checker": "^5.6"
     }

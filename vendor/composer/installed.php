@@ -1,19 +1,19 @@
 <?php return array(
     'root' => array(
-        'name' => '__root__',
+        'name' => 'mai/embed-fixer',
         'pretty_version' => 'dev-develop',
         'version' => 'dev-develop',
-        'reference' => 'be05b8fcf02457f7cd5635b52a6910c1e55d75c2',
+        'reference' => '12ea491ceafa7600839b1bca68c2ee636198688c',
         'type' => 'library',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
         'dev' => true,
     ),
     'versions' => array(
-        '__root__' => array(
+        'mai/embed-fixer' => array(
             'pretty_version' => 'dev-develop',
             'version' => 'dev-develop',
-            'reference' => 'be05b8fcf02457f7cd5635b52a6910c1e55d75c2',
+            'reference' => '12ea491ceafa7600839b1bca68c2ee636198688c',
             'type' => 'library',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),
