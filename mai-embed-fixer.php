@@ -4,7 +4,7 @@
  * Plugin Name:     Mai Embed Fixer
  * Plugin URI:      https://bizbudding.com/
  * Description:     Attempts to fix twitter/x and instagram embeds that aren't working in WordPress.
- * Version:         0.1.1
+ * Version:         0.2.0
  *
  * Author:          BizBudding
  * Author URI:      https://bizbudding.com
@@ -44,14 +44,10 @@ function convert_embeds( $block_content, $block ) {
 		// Check for known hosts.
 		switch ( $host ) {
 			case 'instagram.com':
-				$replace .= '<figure class="wp-embed-instagram" style="width:100%;max-width:540px;">';
-				$replace .= sprintf( '<blockquote class="instagram-media" style="width:100%%;" data-instgrm-captioned data-instgrm-permalink="%s" data-instgrm-version="14"></blockquote>', esc_url( $url ) );
-				$replace .= '</figure>';
+				$replace .= get_embed( $url, 'instagram' );
 				break;
 			case 'twitter.com':
-				$replace .= '<figure class="wp-embed-twitter" style="width:100%;max-width:540px;">';
-				$replace .= sprintf( '<blockquote class="twitter-tweet" style="width:100%%;" data-lang="en"><a href="%s"></a></blockquote>', esc_url( $url ) );
-				$replace .= '</figure>';
+				$replace .= get_embed( $url, 'twitter' );
 				break;
 			default:
 				return $block_content;
@@ -64,6 +60,50 @@ function convert_embeds( $block_content, $block ) {
 	}
 
 	return $block_content;
+}
+
+add_filter( 'do_shortcode_tag', __NAMESPACE__ . '\convert_embed_shortcode', 10, 2);
+/**
+ * Convert embed shortcode to the proper social media embed format.
+ *
+ * @since 0.2.0
+ *
+ * @param string $output The output from the shortcode.
+ * @param string $tag    The name of the shortcode.
+ *
+ * @return string The modified output.
+ */
+function convert_embed_shortcode( $output, $tag ) {
+	// Bail if not an embed shortcode.
+	if ( 'embed' !== $tag ) {
+		return $output;
+	}
+
+	// Set up tag processor.
+	$tags = new WP_HTML_Tag_Processor( $output );
+
+	// Loop through tags.
+	while ( $tags->next_tag( [ 'tag_name' => 'a' ] ) ) {
+		$url = $tags->get_attribute( 'href' );
+		break;
+	}
+
+	// Bail if no url.
+	if ( ! $url ) {
+		return $output;
+	}
+
+	$replace = '';
+
+	if ( str_contains( $output, 'instagram.com' ) ) {
+		$replace .= get_embed( $url, 'instagram' );
+	}
+
+	if ( str_contains( $output, 'twitter.com' ) ) {
+		$replace .= get_embed( $url, 'twitter' );
+	}
+
+	return $replace ?? $output;
 }
 
 add_filter( 'the_content', __NAMESPACE__ . '\add_scripts', 30, 1 );
@@ -90,7 +130,6 @@ function add_scripts( $content ) {
 	// Should run.
 	$has_twitter   = false;
 	$has_instagram = false;
-
 
 	// Set up tag processor.
 	$tags = new WP_HTML_Tag_Processor( $content );
@@ -123,8 +162,15 @@ function add_scripts( $content ) {
 			$content = preg_replace( '/<script[^>]*src="[^"]*platform\.twitter\.com\/widgets\.js[^"]*"[^>]*><\/script>/', '', $content, -1 );
 		}
 
-		// Add the script at the end of the content.
-		$content .= '<script async class="mai-twitter-script" src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>';
+		// Try to find the first Twitter figure and add script before it.
+		$twitter_script = '<script async class="mai-twitter-script" src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>';
+		$content_og     = $content;
+		$content        = preg_replace( '/(<figure[^>]*class="[^"]*wp-embed-twitter[^"]*"[^>]*>)/', $twitter_script . '$1', $content, 1 );
+
+		// Fallback: If regex replacement failed (content unchanged), add script at the end.
+		if ( $content === $content_og ) {
+			$content .= $twitter_script;
+		}
 	}
 
 	// If we have an instagram embed.
@@ -135,11 +181,47 @@ function add_scripts( $content ) {
 			$content = preg_replace( '/<script[^>]*src="[^"]*www\.instagram\.com\/embed\.js[^"]*"[^>]*><\/script>/', '', $content, -1 );
 		}
 
-		// Add the script at the end of the content.
-		$content .= '<script async class="mai-instagram-script" src="//www.instagram.com/embed.js" charset="utf-8"></script>';
+		// Try to find the first Instagram figure and add script before it.
+		$instagram_script = '<script async class="mai-instagram-script" src="//www.instagram.com/embed.js" charset="utf-8"></script>';
+		$content_og       = $content;
+		$content          = preg_replace( '/(<figure[^>]*class="[^"]*wp-embed-instagram[^"]*"[^>]*>)/', $instagram_script . '$1', $content, 1 );
+
+		// Fallback: If regex replacement failed (content unchanged), add script at the end.
+		if ( $content === $content_og ) {
+			$content .= $instagram_script;
+		}
 	}
 
 	return $content;
+}
+
+/**
+ * Get the embed for a given url and type.
+ *
+ * @since 0.2.0
+ *
+ * @param string $url The url of the embed.
+ * @param string $type The type of embed.
+ *
+ * @return string The embed.
+ */
+function get_embed( $url, $type ) {
+	$embed = '';
+
+	switch ( $type ) {
+		case 'instagram':
+			$embed .= '<figure class="wp-embed-instagram" style="width:100%;max-width:540px;">';
+			$embed .= sprintf( '<blockquote class="instagram-media" style="width:100%%;" data-instgrm-captioned data-instgrm-permalink="%s" data-instgrm-version="14"></blockquote>', esc_url( $url ) );
+			$embed .= '</figure>';
+			break;
+		case 'twitter':
+			$embed .= '<figure class="wp-embed-twitter" style="width:100%;max-width:540px;">';
+			$embed .= sprintf( '<blockquote class="twitter-tweet" style="width:100%%;" data-lang="en"><a href="%s"></a></blockquote>', esc_url( $url ) );
+			$embed .= '</figure>';
+			break;
+	}
+
+	return $embed;
 }
 
 add_action( 'plugins_loaded', __NAMESPACE__ . '\updater' );
