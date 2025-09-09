@@ -4,7 +4,7 @@
  * Plugin Name:     Mai Embed Fixer
  * Plugin URI:      https://bizbudding.com/
  * Description:     Attempts to fix twitter/x and instagram embeds that aren't working in WordPress.
- * Version:         0.2.0
+ * Version:         0.2.1
  *
  * Author:          BizBudding
  * Author URI:      https://bizbudding.com
