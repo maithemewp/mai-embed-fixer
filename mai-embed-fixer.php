@@ -5,6 +5,7 @@
  * Plugin URI:      https://bizbudding.com/
  * Description:     Attempts to fix twitter/x and instagram embeds that aren't working in WordPress.
  * Version:         0.2.2
+ * Requires PHP:    8.1
  *
  * Author:          BizBudding
  * Author URI:      https://bizbudding.com
