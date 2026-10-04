@@ -2,15 +2,14 @@
 Updated: 2026-10-04 by Claude
 
 ## Now
-0.3.0 committed on `develop`, not pushed or tagged. Fixes Instagram embeds that use account-name links (`instagram.com/{user}/p/{id}/`), which Instagram's embed.js can't load. Also adds x.com support and modernizes the code (strict types, enum, match). A second commit fixes what the review found: regex failures return the post untouched, the shortcode reads its own url, only single-post links convert, and each embed keeps a visible link.
+0.3.0 released on 2026-10-04 (tag `0.3.0`, `main` and `develop` at `90496d9`). It fixes Instagram embeds with account-name links (`instagram.com/{user}/p/{id}/`), adds x.com, converts only single-post links, and keeps a visible link in each embed.
 
 ## Next
-- Push and tag 0.3.0 once Mike approves.
-- Update verilymag.com, then tell Mary Rose (Help Scout #785724) the draft can be published.
+- Confirm verilymag.com has updated to 0.3.0, then tell Mary Rose (Help Scout #785724) the draft can be published.
 - Decide whether to raise `Requires PHP` from 8.1 to 8.2. Web PHP per site is set in nginx and wasn't checked.
 
 ## Blocked / waiting on
-Mike's go-ahead to push and tag.
+Nothing.
 
 ## Verify
 - Local copy: `~/Herd/verilymag`. Post 48172 has 7 Instagram embeds, 5 with account-name links.
