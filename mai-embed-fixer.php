@@ -1,14 +1,15 @@
 <?php
 
 /**
- * Plugin Name:     Mai Embed Fixer
- * Plugin URI:      https://bizbudding.com/
- * Description:     Attempts to fix twitter/x and instagram embeds that aren't working in WordPress.
- * Version:         0.3.0
- * Requires PHP:    8.1
+ * Plugin Name:       Mai Embed Fixer
+ * Plugin URI:        https://bizbudding.com/
+ * Description:       Attempts to fix twitter/x and instagram embeds that aren't working in WordPress.
+ * Version:           0.3.0
+ * Requires at least: 6.2
+ * Requires PHP:      8.1
  *
- * Author:          BizBudding
- * Author URI:      https://bizbudding.com
+ * Author:            BizBudding
+ * Author URI:        https://bizbudding.com
  */
 
 declare(strict_types=1);
@@ -26,6 +27,10 @@ require_once __DIR__ . '/vendor/autoload.php';
 
 /**
  * The social networks this plugin knows how to embed.
+ *
+ * Everything that differs between networks lives here, so adding a network
+ * means adding a case and its match arms. None of the matches has a default,
+ * so a missing arm throws UnhandledMatchError instead of quietly doing nothing.
  *
  * @since 0.3.0
  */
@@ -47,7 +52,7 @@ enum Network: string {
 	 */
 	public static function from_url( string $url ): ?self {
 		$host = strtolower( (string) parse_url( $url, PHP_URL_HOST ) );
-		$host = preg_replace( '/^(www|mobile)\./', '', $host );
+		$host = (string) preg_replace( '/^(www|mobile)\./', '', $host );
 
 		return match ( $host ) {
 			'instagram.com'        => self::Instagram,
@@ -55,6 +60,125 @@ enum Network: string {
 			default                => null,
 		};
 	}
+
+	/**
+	 * Get the url the network's script can embed, or null if the url isn't a single post.
+	 *
+	 * Profile, hashtag and explore links share the host but have nothing to
+	 * embed, so converting them would leave an empty frame. Those return null
+	 * and the original content is kept.
+	 *
+	 * Instagram's script builds its iframe from the url plus `embed/captioned/`.
+	 * Its share button gives links with the account name in the path, like
+	 * `instagram.com/{user}/p/{id}/`, and the embed page for that shape 404s,
+	 * redirects to the homepage, and is refused in an iframe. The same is true
+	 * of `/reels/{id}/`. So Instagram urls are rewritten to
+	 * `https://www.instagram.com/{p|reel|tv}/{id}/`, dropping everything after the id.
+	 *
+	 * @since 0.3.0
+	 *
+	 * @param string $url The url.
+	 *
+	 * @return string|null
+	 */
+	public function permalink( string $url ): ?string {
+		$path = (string) parse_url( $url, PHP_URL_PATH );
+
+		return match ( $this ) {
+			self::Instagram => preg_match( '#^/(?:[^/]+/)?(p|reels?|tv)/([A-Za-z0-9_-]+)#', $path, $matches )
+				? sprintf( 'https://www.instagram.com/%s/%s/', 'reels' === $matches[1] ? 'reel' : $matches[1], $matches[2] )
+				: null,
+			self::Twitter   => preg_match( '#^/(?:[^/]+|i/web)/status(?:es)?/\d+#', $path ) ? $url : null,
+		};
+	}
+
+	/**
+	 * Get the blockquote class the network's script looks for.
+	 *
+	 * @since 0.3.0
+	 *
+	 * @return string
+	 */
+	public function blockquote_class(): string {
+		return match ( $this ) {
+			self::Instagram => 'instagram-media',
+			self::Twitter   => 'twitter-tweet',
+		};
+	}
+
+	/**
+	 * Get the script tag that turns the blockquotes into embeds.
+	 *
+	 * @since 0.3.0
+	 *
+	 * @return string
+	 */
+	public function script(): string {
+		return match ( $this ) {
+			self::Instagram => '<script async class="mai-instagram-script" src="//www.instagram.com/embed.js" charset="utf-8"></script>',
+			self::Twitter   => '<script async class="mai-twitter-script" src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>',
+		};
+	}
+
+	/**
+	 * Get a regex fragment that matches the script's src, for finding copies already in the content.
+	 *
+	 * @since 0.3.0
+	 *
+	 * @return string
+	 */
+	public function script_pattern(): string {
+		return match ( $this ) {
+			self::Instagram => 'www\.instagram\.com\/embed\.js',
+			self::Twitter   => 'platform\.twitter\.com\/widgets\.js',
+		};
+	}
+
+	/**
+	 * Get the embed markup for a permalink.
+	 *
+	 * The url is also the link text inside the blockquote, so readers still
+	 * get a link to the post when an ad blocker or consent tool stops the
+	 * network's script.
+	 *
+	 * @since 0.3.0
+	 *
+	 * @param string $permalink A url from permalink().
+	 *
+	 * @return string
+	 */
+	public function embed( string $permalink ): string {
+		$attributes = match ( $this ) {
+			self::Instagram => sprintf( ' data-instgrm-captioned data-instgrm-permalink="%s" data-instgrm-version="14"', esc_url( $permalink ) ),
+			self::Twitter   => ' data-lang="en"',
+		};
+
+		return sprintf(
+			'<figure class="wp-embed-%1$s" style="width:100%%;max-width:540px;"><blockquote class="%2$s" style="width:100%%;"%3$s><a href="%4$s">%5$s</a></blockquote></figure>',
+			$this->value,
+			$this->blockquote_class(),
+			$attributes,
+			esc_url( $permalink ),
+			esc_html( $permalink )
+		);
+	}
+}
+
+/**
+ * Get the embed markup for a url, or null if the url isn't a post we can embed.
+ *
+ * @since 0.2.0
+ * @since 0.3.0 Takes only a url, and returns null for urls we don't handle.
+ *
+ * @param string $url The url.
+ *
+ * @return string|null
+ */
+function get_embed( string $url ): ?string {
+	$network   = Network::from_url( $url );
+	$permalink = $network?->permalink( $url );
+
+	return $permalink ? $network->embed( $permalink ) : null;
 }
 
 add_filter( 'render_block_core/embed', __NAMESPACE__ . '\convert_embeds', 20, 2 );
@@ -66,55 +190,49 @@ add_filter( 'render_block_core/embed', __NAMESPACE__ . '\convert_embeds', 20, 2 
  * for the network's own blockquote markup, which its script turns into the
  * real embed in the browser.
  *
- * @since 0.1.0
- * @since 0.3.0 Handles x.com urls.
+ * The block's url attribute is the source of truth, so the incoming content
+ * is replaced outright and never needs to be a string.
  *
- * @param mixed $block_content The content of the block. Another filter may have broken it, so it isn't trusted to be a string.
+ * @since 0.1.0
+ * @since 0.3.0 Handles x.com and mobile. hosts, and skips urls that aren't a single post.
+ *
+ * @param mixed $block_content The content of the block.
  * @param array $block         The block data.
  *
  * @return mixed The content of the block.
  */
 function convert_embeds( mixed $block_content, array $block ): mixed {
-	$url     = (string) ( $block['attrs']['url'] ?? '' );
-	$network = $url ? Network::from_url( $url ) : null;
-
-	if ( ! $network ) {
-		return $block_content;
-	}
-
-	return get_embed( $url, $network );
+	return get_embed( (string) ( $block['attrs']['url'] ?? '' ) ) ?? $block_content;
 }
 
-add_filter( 'do_shortcode_tag', __NAMESPACE__ . '\convert_embed_shortcode', 10, 2 );
+add_filter( 'do_shortcode_tag', __NAMESPACE__ . '\convert_embed_shortcode', 10, 4 );
 /**
  * Convert the [embed] shortcode to the proper social media embed format.
  *
  * Classic content goes through the shortcode instead of the block, so it
- * needs the same swap. The url comes from the first link in the output.
+ * needs the same swap. The url is the shortcode's content, or its `src`
+ * attribute, the same places core reads it from. We don't read it from the
+ * output, because when oEmbed works the first link there can be a hashtag
+ * or mention instead of the post.
  *
  * @since 0.2.0
- * @since 0.3.0 Returns the original output when the url isn't one we handle.
+ * @since 0.3.0 Reads the url from the shortcode, and returns the original output for urls we don't handle.
  *
- * @param mixed  $output The output from the shortcode. Any shortcode's callback lands here, and some return null or false.
- * @param string $tag    The name of the shortcode.
+ * @param mixed        $output The output from the shortcode. Any shortcode's callback lands here, and some return null or false.
+ * @param string       $tag    The name of the shortcode.
+ * @param array|string $attr   The shortcode attributes, or an empty string when there are none.
+ * @param array        $m      The regex match for the shortcode. Index 5 is its content.
  *
  * @return mixed The modified output.
  */
-function convert_embed_shortcode( mixed $output, string $tag ): mixed {
-	if ( 'embed' !== $tag || ! is_string( $output ) ) {
+function convert_embed_shortcode( mixed $output, string $tag, array|string $attr = '', array $m = [] ): mixed {
+	if ( 'embed' !== $tag ) {
 		return $output;
 	}
 
-	$tags = new WP_HTML_Tag_Processor( $output );
-	$url  = $tags->next_tag( [ 'tag_name' => 'a' ] ) ? (string) $tags->get_attribute( 'href' ) : '';
+	$url = trim( (string) ( $m[5] ?? '' ) ) ?: (string) ( is_array( $attr ) ? $attr['src'] ?? '' : '' );
 
-	$network = $url ? Network::from_url( $url ) : null;
-
-	if ( ! $network ) {
-		return $output;
-	}
-
-	return get_embed( $url, $network );
+	return get_embed( $url ) ?? $output;
 }
 
 add_filter( 'the_content', __NAMESPACE__ . '\add_scripts', 30, 1 );
@@ -122,11 +240,15 @@ add_filter( 'the_content', __NAMESPACE__ . '\add_scripts', 30, 1 );
  * Add each network's script to singular posts that have one of its embeds.
  *
  * Embeds pasted from the networks often bring their own script tag, so a
- * post can end up loading the same script several times. We strip those and
- * add one copy, before the first of our embeds, or at the end if there is
- * none of ours (e.g. only a custom HTML embed).
+ * post can end up loading the same script several times. We remove every
+ * copy and add one back, before the first of our embeds, or at the end if
+ * there is none of ours (e.g. only a custom HTML embed).
+ *
+ * If a regex fails (a huge post can hit PCRE's limits), the post is
+ * returned untouched rather than blanked.
  *
  * @since 0.1.0
+ * @since 0.3.0 Returns the original content if a regex fails.
  *
  * @param mixed $content The content of the post. Another filter may have broken it, so it isn't trusted to be a string.
  *
@@ -137,116 +259,34 @@ function add_scripts( mixed $content ): mixed {
 		return $content;
 	}
 
+	$original = $content;
+
 	foreach ( Network::cases() as $network ) {
-		if ( ! has_blockquote( $content, get_blockquote_class( $network ) ) ) {
+		$tags = new WP_HTML_Tag_Processor( $content );
+
+		if ( ! $tags->next_tag( [ 'tag_name' => 'blockquote', 'class_name' => $network->blockquote_class() ] ) ) {
 			continue;
 		}
 
-		[ $src_pattern, $script ] = match ( $network ) {
-			Network::Twitter   => [
-				'platform\.twitter\.com\/widgets\.js',
-				'<script async class="mai-twitter-script" src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>',
-			],
-			Network::Instagram => [
-				'www\.instagram\.com\/embed\.js',
-				'<script async class="mai-instagram-script" src="//www.instagram.com/embed.js" charset="utf-8"></script>',
-			],
-		};
-
 		// Remove every existing copy of the script. We add one back below.
-		$content = preg_replace( '/<script[^>]*src="[^"]*' . $src_pattern . '[^"]*"[^>]*><\/script>/', '', $content );
+		$content = preg_replace( '/<script[^>]*src="[^"]*' . $network->script_pattern() . '[^"]*"[^>]*><\/script>/', '', $content );
+
+		if ( null === $content ) {
+			return $original;
+		}
 
 		// Add the script before our first embed figure, or at the end if there isn't one.
 		$figure  = '/(<figure[^>]*class="[^"]*wp-embed-' . $network->value . '[^"]*"[^>]*>)/';
-		$updated = preg_replace( $figure, $script . '$1', $content, 1 );
-		$content = $updated === $content ? $content . $script : $updated;
+		$updated = preg_replace( $figure, $network->script() . '$1', $content, 1 );
+
+		if ( null === $updated ) {
+			return $original;
+		}
+
+		$content = $updated === $content ? $content . $network->script() : $updated;
 	}
 
 	return $content;
-}
-
-/**
- * Check whether content has a blockquote with a given class.
- *
- * @since 0.3.0
- *
- * @param string $content    The content to check.
- * @param string $class_name The blockquote class to look for.
- *
- * @return bool
- */
-function has_blockquote( string $content, string $class_name ): bool {
-	$tags = new WP_HTML_Tag_Processor( $content );
-
-	return $tags->next_tag( [ 'tag_name' => 'blockquote', 'class_name' => $class_name ] );
-}
-
-/**
- * Get the blockquote class each network's script looks for.
- *
- * @since 0.3.0
- *
- * @param Network $network The network.
- *
- * @return string
- */
-function get_blockquote_class( Network $network ): string {
-	return match ( $network ) {
-		Network::Twitter   => 'twitter-tweet',
-		Network::Instagram => 'instagram-media',
-	};
-}
-
-/**
- * Get the embed markup for a url.
- *
- * @since 0.2.0
- * @since 0.3.0 Takes a Network instead of a string, and normalizes Instagram urls.
- *
- * @param string  $url     The url of the embed.
- * @param Network $network The network the url belongs to.
- *
- * @return string The embed.
- */
-function get_embed( string $url, Network $network ): string {
-	return match ( $network ) {
-		Network::Instagram => sprintf(
-			'<figure class="wp-embed-instagram" style="width:100%%;max-width:540px;"><blockquote class="instagram-media" style="width:100%%;" data-instgrm-captioned data-instgrm-permalink="%s" data-instgrm-version="14"></blockquote></figure>',
-			esc_url( normalize_instagram_url( $url ) )
-		),
-		Network::Twitter   => sprintf(
-			'<figure class="wp-embed-twitter" style="width:100%%;max-width:540px;"><blockquote class="twitter-tweet" style="width:100%%;" data-lang="en"><a href="%s"></a></blockquote></figure>',
-			esc_url( $url )
-		),
-	};
-}
-
-/**
- * Normalize an Instagram url to the shape Instagram's embed.js can load.
- *
- * embed.js builds its iframe from the permalink plus `embed/captioned/`.
- * Instagram now shares links with the account name in the path, like
- * `instagram.com/{user}/p/{id}/`, and the embed page for that shape 404s,
- * redirects to the homepage, and is refused in an iframe. The same is true
- * of `/reels/{id}/`. Editors paste these links as-is, so we rewrite them to
- * `instagram.com/{p|reel|tv}/{id}/` and drop the query string.
- *
- * @since 0.3.0
- *
- * @param string $url The Instagram url.
- *
- * @return string The normalized url, or the original if it isn't a post, reel, or tv url.
- */
-function normalize_instagram_url( string $url ): string {
-	$path = (string) parse_url( $url, PHP_URL_PATH );
-
-	if ( ! preg_match( '#^/(?:[^/]+/)?(p|reels?|tv)/([A-Za-z0-9_-]+)#', $path, $matches ) ) {
-		return $url;
-	}
-
-	$type = 'reels' === $matches[1] ? 'reel' : $matches[1];
-
-	return sprintf( 'https://www.instagram.com/%s/%s/', $type, $matches[2] );
 }
 
 add_action( 'plugins_loaded', __NAMESPACE__ . '\updater' );

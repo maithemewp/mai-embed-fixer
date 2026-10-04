@@ -19,8 +19,10 @@ Mai Embed Fixer is designed to solve common issues with social media embeds in W
 ### Embed Conversion
 The plugin hooks into WordPress's `render_block_core/embed` filter to intercept embed blocks and convert them to the proper social media embed format:
 
-- **Instagram**: Converts to Instagram's official embed format. Links with the account name in the path (`instagram.com/{user}/p/{id}/`) and `/reels/` links are rewritten to `instagram.com/p/{id}/` or `instagram.com/reel/{id}/`, because Instagram can't embed the longer form.
+- **Instagram**: Converts to Instagram's official embed format. Instagram's script can't load links with the account name in the path (`instagram.com/{user}/p/{id}/`) or `/reels/` links, so the plugin rewrites them to `instagram.com/p/{id}/`, `/reel/{id}/` or `/tv/{id}/`.
 - **Twitter/X**: Converts `twitter.com` and `x.com` links to Twitter's official embed format.
+
+Only links to a single post are converted. Profile, hashtag and other links are left as WordPress rendered them. Each embed keeps the post's link as text, so readers still get a link when an ad blocker stops the network's script.
 
 ### Script Management
 The plugin automatically adds the necessary JavaScript files to render social media embeds:
@@ -28,7 +30,7 @@ The plugin automatically adds the necessary JavaScript files to render social me
 - **Twitter**: Adds `https://platform.twitter.com/widgets.js`
 - **Instagram**: Adds `//www.instagram.com/embed.js`
 
-The plugin intelligently detects when these scripts are already present and prevents duplicates.
+The plugin removes any copies of these scripts already in the post and adds one.
 
 ## Installation
 
