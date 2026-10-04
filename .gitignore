@@ -79,3 +79,6 @@ jspm_packages/
 
 # deployable-guard's generated pre-commit hook (dev-only; regenerated on install).
 .githooks/
+
+# Local deploy config, one per machine. Created by `mai-sites init`.
+mai-sites.json
