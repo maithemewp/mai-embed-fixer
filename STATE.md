@@ -1,8 +1,10 @@
 # State
-Updated: 2026-10-04 by Claude
+Updated: 2026-11-18 by Claude
 
 ## Now
 0.3.0 released on 2026-10-04 (tag `0.3.0`, `main` and `develop` at `90496d9`). It fixes Instagram embeds with account-name links (`instagram.com/{user}/p/{id}/`), adds x.com, converts only single-post links, and keeps a visible link in each embed.
+
+On 2026-11-18 0.3.0 was pushed and activated on the 41 sites that run Mai Performance Media 1.0.0 but had no Embed Fixer, so it now runs on every one of them. Before that, pasted Instagram and X embeds with no script showed only their link on those sites: 1,888 Instagram posts on one site, 632 on another. Mai Performance Media delays the script the fixer adds until each embed nears the screen. Three dev or staging copies still run 0.2.1 or 0.2.2.
 
 ## Next
 - Confirm verilymag.com has updated to 0.3.0, then tell Mary Rose (Help Scout #785724) the draft can be published.
